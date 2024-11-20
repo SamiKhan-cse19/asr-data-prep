@@ -1,10 +1,27 @@
-import os
 import zmq
 from yt_dlp import YoutubeDL
-from datetime import datetime
 
-ydl_opts = {
-        'ignoreerrors': True,
+def downloader():
+    context = zmq.Context()
+    url_receiver = context.socket(zmq.PULL)
+    url_receiver.connect("tcp://localhost:5550")
+    filename_sender = context.socket(zmq.PUSH)
+    filename_sender.bind("tcp://*:5555")
+
+    def on_complete(d):
+        """Callback when a file download is complete."""
+        if d['status'] == 'finished':
+            print("Download successful")
+            filename = d['info_dict']['filepath']
+            filename_mp3 = filename.replace(".webm", ".mp3")
+            print(f"Downloaded: {filename}")
+            filename_sender.send_string(filename_mp3)
+        elif d['status'] == 'error':
+            print("Download failed")
+            print(d['error'])
+
+
+    ydl_opts = {
         'abort_on_unavailable_fragments': True,
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -19,33 +36,17 @@ ydl_opts = {
         ],
         'prefer_ffmpeg': True,
         'keepvideo': False,
+        'outtmpl': 'downloads/%(channel_id)s/%(id)s.%(ext)s',
+        'postprocessor_hooks': [on_complete]
     }
 
-# Calculate the date one year ago in the format required by yt-dlp (YYYYMMDD)
-one_year_ago = datetime.now().strftime("%Y%m%d")
-
-def _duration_filter(info_dict, *, incomplete):
-    """Filter videos longer than 20 minutes."""
-    if incomplete:
-        # Allow download if metadata is incomplete (e.g., during playlist processing)
-        return None
-    duration = info_dict.get('duration', 0)  # Duration in seconds
-    if duration > 20 * 60:  # 20 minutes
-        return None  # None means the video passes the filter
-    return f"Video is shorter than 20 minutes ({duration} seconds)."
-
-def download_urls(urls, location="data", apply_time_filter=True, apply_duration_filter=True):
-    # os.makedirs(location, exist_ok=True)  # yt-dlp will create the directory if it doesn't exist
-    ydl_opts['outtmpl'] = os.path.join(location, '%(id)s.%(ext)s')
-
-    if apply_time_filter:
-        ydl_opts['dateafter'] = one_year_ago
-
-    if apply_duration_filter:
-        ydl_opts['match_filter'] = _duration_filter
-    
-    for url in urls:
-        with YoutubeDL(ydl_opts) as ydl:
+    with YoutubeDL(ydl_opts) as ydl:
+        print("Downloader is ready and waiting for URLs...")
+        while True:
+            url = url_receiver.recv_string()
+            print(f"Received URL: {url}")
             ydl.download([url])
 
-    return [os.path.join(location, f"{url.split('=')[-1]}.mp3") for url in urls]
+if __name__ == "__main__":
+    downloader()
+
