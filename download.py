@@ -10,7 +10,7 @@ def downloader():
 
     def on_complete(d):
         """Callback when a file download is complete."""
-        if d['status'] == 'finished' and d['info_dict']['filepath'] is not None:
+        if d['status'] == 'finished' and d['info_dict'].get('filepath') is not None:
             filename = d['info_dict']['filepath']
             if filename.endswith(".mp3"):
                 print(f"Saved: {filename}")
@@ -43,7 +43,11 @@ def downloader():
         while True:
             url = url_receiver.recv_string()
             print(f"Received URL: {url}")
-            ydl.download([url])
+            try:
+                ydl.download([url])
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
 
 if __name__ == "__main__":
     downloader()

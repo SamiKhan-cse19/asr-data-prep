@@ -53,10 +53,14 @@ def vad_processor():
     while True:
         audio_file = url_receiver.recv_string()  # Receive audio file path
         print(f"Processing VAD for: {audio_file}")
-        results = vad_process(audio_file)  # Process VAD
-        print("Sending chunks to splitter...")
-        for result in results:
-            chunk_sender.send_pyobj(result)  # Send result as a Python object to the splitter
+        try:
+            results = vad_process(audio_file)  # Process VAD
+            print("Sending chunks to splitter...")
+            for result in results:
+                chunk_sender.send_pyobj(result)  # Send result as a Python object to the splitter
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
 
 if __name__ == "__main__":
     vad_processor()

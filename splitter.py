@@ -32,13 +32,17 @@ def splitter():
 
     while True:
         data = chunk_receiver.recv_pyobj()  # Receive data as a Python object
-        audio_id = data["audio_id"]
-        chunk_id = data["chunk_id"]
-        chunk = data["chunk"]
-        sample_rate = data["sample_rate"]
+        try:
+            audio_id = data["audio_id"]
+            chunk_id = data["chunk_id"]
+            chunk = data["chunk"]
+            sample_rate = data["sample_rate"]
 
-        print(f"Received chunk {chunk_id} for: {audio_id}")
-        save_chunk(chunk, audio_id, chunk_id, sample_rate)
+            print(f"Received chunk {chunk_id} for: {audio_id}")
+            save_chunk(chunk, audio_id, chunk_id, sample_rate)
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
 
 
 if __name__ == "__main__":
