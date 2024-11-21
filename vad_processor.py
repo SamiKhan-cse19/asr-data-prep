@@ -1,3 +1,4 @@
+import os
 import zmq
 from silero_vad import load_silero_vad, read_audio, get_speech_timestamps
 
@@ -10,6 +11,7 @@ def vad_process(audio_file: str):
     audio_id = audio_file.split("/")[-1].split(".")[0]
 
     wav = read_audio(audio_file)
+    os.remove(audio_file)  # Remove the downloaded audio file
 
     speech_timestamps = get_speech_timestamps(
         wav,
