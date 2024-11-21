@@ -10,12 +10,11 @@ def downloader():
 
     def on_complete(d):
         """Callback when a file download is complete."""
-        if d['status'] == 'finished':
-            print("Download successful")
+        if d['status'] == 'finished' and d['info_dict']['filepath'] is not None:
             filename = d['info_dict']['filepath']
-            filename_mp3 = filename.replace(".webm", ".mp3")
-            print(f"Downloaded: {filename}")
-            filename_sender.send_string(filename_mp3)
+            if filename.endswith(".mp3"):
+                print(f"Saved: {filename}")
+                filename_sender.send_string(filename)
         elif d['status'] == 'error':
             print("Download failed")
             print(d['error'])
@@ -28,7 +27,6 @@ def downloader():
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '128',  # You can set the quality as needed
-            'nopostoverwrites': False,  # Ensure postprocessing overwrites files if needed
         }],
         'postprocessor_args': [
             '-ar', '16000',  # 16 KHz sampling rate

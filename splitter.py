@@ -8,17 +8,16 @@ CHUNKS_DIR = "chunks"
 os.makedirs(CHUNKS_DIR, exist_ok=True)
 
 
-def save_chunks(chunks, audio_id, sample_rate):
+def save_chunk(chunk, audio_id, chunk_id, sample_rate):
     """Save audio chunks to files."""
-    for i, chunk in enumerate(chunks):
-        chunk_filename = os.path.join(CHUNKS_DIR, f"{audio_id}_{i}.mp3")
-        torchaudio.save(
-            chunk_filename,
-            chunk,
-            sample_rate=sample_rate,
-            format="mp3",
-        )
-        print(f"Saved chunk: {chunk_filename}")
+    chunk_filename = os.path.join(CHUNKS_DIR, f"{audio_id}#{chunk_id}.mp3")
+    torchaudio.save(
+        chunk_filename,
+        chunk,
+        sample_rate=sample_rate,
+        format="mp3",
+    )
+    print(f"Saved chunk: {chunk_filename}")
 
 
 def splitter():
@@ -34,11 +33,12 @@ def splitter():
     while True:
         data = chunk_receiver.recv_pyobj()  # Receive data as a Python object
         audio_id = data["audio_id"]
-        chunks = data["chunks"]
+        chunk_id = data["chunk_id"]
+        chunk = data["chunk"]
         sample_rate = data["sample_rate"]
 
-        print(f"Received data for audio_id: {audio_id}, saving {len(chunks)} chunks...")
-        save_chunks(chunks, audio_id, sample_rate)
+        print(f"Received chunk {chunk_id} for: {audio_id}")
+        save_chunk(chunk, audio_id, chunk_id, sample_rate)
 
 
 if __name__ == "__main__":
