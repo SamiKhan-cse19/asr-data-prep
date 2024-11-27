@@ -1,12 +1,28 @@
 import zmq
+import boto3
 from yt_dlp import YoutubeDL
+import os
+
+# Initialize S3 client
+s3 = boto3.client('s3')
+BUCKET_NAME = 'yt-dl-mp3'
+
+
+def uploader_to_s3(file_path):
+    """Uploads a file to the specified S3 bucket."""
+    try:
+        s3_key = os.path.relpath(file_path, start='downloads')  # Remove 'downloads/' prefix for S3 key
+        s3.upload_file(file_path, BUCKET_NAME, s3_key)
+        print(f"Uploaded to S3: s3://{BUCKET_NAME}/{s3_key}")
+    except Exception as e:
+        print(f"Failed to upload {file_path} to S3: {e}")
 
 def downloader():
     context = zmq.Context()
     url_receiver = context.socket(zmq.PULL)
     url_receiver.connect("tcp://localhost:5550")
-    filename_sender = context.socket(zmq.PUSH)
-    filename_sender.bind("tcp://*:5555")
+    # filename_sender = context.socket(zmq.PUSH)
+    # filename_sender.bind("tcp://*:5555")
 
     def on_complete(d):
         """Callback when a file download is complete."""
@@ -14,12 +30,13 @@ def downloader():
             filename = d['info_dict']['filepath']
             if filename.endswith(".mp3"):
                 print(f"Saved: {filename}")
-                filename_sender.send_string(filename)
+                uploader_to_s3(filename)  # Upload the file to S3
+                os.remove(filename)
+                # filename_sender.send_string(filename)
         elif d['status'] == 'error':
             print("Download failed")
             print(d['error'])
-
-
+                                                                                
     ydl_opts = {
         'abort_on_unavailable_fragments': True,
         'format': 'bestaudio/best',
@@ -34,7 +51,7 @@ def downloader():
         ],
         'prefer_ffmpeg': True,
         'keepvideo': False,
-        'outtmpl': 'downloads/%(channel_id)s/%(id)s.%(ext)s',
+        'outtmpl': 'downloads/%(id)s.%(ext)s',
         'postprocessor_hooks': [on_complete]
     }
 
@@ -51,4 +68,3 @@ def downloader():
 
 if __name__ == "__main__":
     downloader()
-

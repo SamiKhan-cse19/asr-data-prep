@@ -1,6 +1,5 @@
 SAMPLING_RATE = 16000
 import torch
-from save import save_chunks
 torch.set_num_threads(1)
 
 model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
