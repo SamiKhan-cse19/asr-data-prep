@@ -1,6 +1,7 @@
 import os
 import time
 import boto3
+import random
 import torchaudio
 from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor
@@ -63,21 +64,12 @@ def upload_chunk_to_s3(bucket_name, key, audio_chunk):
     finally:
         os.remove(local_path)  # Cleanup local file
 
-def get_files_without_tags(bucket_name):
-    """List all files and filter those without tags or unprocessed tags."""
+def get_all_files(bucket_name):
+    """List all files in an S3 bucket."""
     response = s3.list_objects_v2(Bucket=bucket_name)
     files = response.get('Contents', [])
     print(f"Found {len(files)} files in bucket {bucket_name}.")
-    untagged_files = []
-    for file in files:
-        key = file['Key']
-        try:
-            tags = s3.get_object_tagging(Bucket=bucket_name, Key=key)['TagSet']
-            if not tags or any(tag['Key'] == 'Status' and tag['Value'] == 'unprocessed' for tag in tags):
-                untagged_files.append(key)
-        except ClientError as e:
-            print(f"Error fetching tags for {key}: {e}")
-    return untagged_files
+    return [file['Key'] for file in files]
 
 def tag_file(bucket_name, key, status):
     """Tag a file with a processing status."""
@@ -132,18 +124,29 @@ def main():
     local_dir = '/tmp/'
 
     while True:
-        unprocessed_files = get_files_without_tags(input_bucket)
-        if unprocessed_files:
-            for key in unprocessed_files:
-                tag_file(input_bucket, key, 'in-progress')
-                
-                local_path = f"{local_dir}{key.split('/')[-1]}"
-                download_file(input_bucket, key, local_path)
-                
-                process_file(input_bucket, local_path, output_bucket)
-                
-                tag_file(input_bucket, key, 'completed')
-                delete_file(input_bucket, key)
+        all_files = get_all_files(input_bucket)
+        if len(all_files) > 0:
+            key = random.choice(all_files) # Pick a random file to process
+
+            # Check if the file is already in progress or completed
+            try:
+                tags = s3.get_object_tagging(Bucket=input_bucket, Key=key)['TagSet']
+                if tags and any(tag['Key'] == 'Status' and tag['Value'] in ['in-progress', 'completed'] for tag in tags):
+                    continue
+            except ClientError as e:
+                print(f"Error fetching tags for {key}: {e}")
+                continue
+
+            # Tag the file as in-progress and download it
+            tag_file(input_bucket, key, 'in-progress')
+            
+            local_path = f"{local_dir}{key.split('/')[-1]}"
+            download_file(input_bucket, key, local_path)
+            
+            process_file(input_bucket, local_path, output_bucket)
+            
+            tag_file(input_bucket, key, 'completed')
+            delete_file(input_bucket, key)
         else:
             print("No unprocessed files found. Sleeping...")
             time.sleep(10)
